@@ -2,6 +2,7 @@
  * OcrQueueManager Library
  * Part of CraftThingy Digital Innovation SDK
  * Licensed under Public-Source Corporate Royalty License (PSCRL)
+ * Isomorphic: Runs in both Browser and Node.js environments.
  */
 
 export class OcrQueueManager {
@@ -19,7 +20,7 @@ export class OcrQueueManager {
 
     /**
      * Add new image to the queue and start background OCR runner
-     * @param {Object} item { id, filename, url }
+     * @param {Object} item { id, filename, url } (url can be a URL string, Base64, Node.js Buffer, or Canvas)
      */
     enqueue(item = {}) {
         const queueItem = {
@@ -122,54 +123,70 @@ export class OcrQueueManager {
                 throw new Error("OCR engine client not initialized");
             }
 
-            const img = new Image();
-            img.onload = async () => {
-                try {
-                    const result = await client.recognize(img);
-                    let words = [];
-                    if (result && result.lines) {
-                        result.lines.forEach(line => {
-                            if (line.words) {
-                                words.push(...line.words);
-                            }
-                        });
-                    }
-                    
-                    item.results = words;
-                    item.status = 'ready';
-                    
-                    // Auto-select first loaded item
-                    if (this.activeIndex === -1) {
-                        this.activeIndex = pendingIndex;
-                    }
-                    
-                    this.onItemReady(item, pendingIndex);
-                } catch (err) {
-                    item.status = 'error';
-                    this.onItemError(item, err);
-                } finally {
-                    this.isProcessing = false;
-                    this.onQueueUpdate(this.queue);
-                    this._processNext();
-                }
-            };
-            
-            img.onerror = (err) => {
-                item.status = 'error';
-                this.isProcessing = false;
-                this.onQueueUpdate(this.queue);
-                this.onItemError(item, new Error("Failed to load image element source"));
-                this._processNext();
-            };
+            const isBrowser = typeof window !== 'undefined' && typeof window.Image !== 'undefined';
+            const isUrlString = typeof item.url === 'string';
 
-            img.src = item.url;
+            if (isBrowser && isUrlString) {
+                // Browser environment: Load image URL via DOM Image element before sending to client
+                const img = new Image();
+                img.onload = async () => {
+                    try {
+                        const result = await client.recognize(img);
+                        this._handleSuccess(result, item, pendingIndex);
+                    } catch (err) {
+                        this._handleError(item, err);
+                    }
+                };
+                
+                img.onerror = () => {
+                    this._handleError(item, new Error("Failed to load image element source"));
+                };
+
+                img.src = item.url;
+            } else {
+                // Node.js or Buffer environment: Pass URL/Buffer/Canvas directly to the OCR client
+                try {
+                    const result = await client.recognize(item.url);
+                    this._handleSuccess(result, item, pendingIndex);
+                } catch (err) {
+                    this._handleError(item, err);
+                }
+            }
         } catch (err) {
-            item.status = 'error';
-            this.isProcessing = false;
-            this.onQueueUpdate(this.queue);
-            this.onItemError(item, err);
-            this._processNext();
+            this._handleError(item, err);
         }
+    }
+
+    _handleSuccess(result, item, pendingIndex) {
+        let words = [];
+        if (result && result.lines) {
+            result.lines.forEach(line => {
+                if (line.words) {
+                    words.push(...line.words);
+                }
+            });
+        }
+        
+        item.results = words;
+        item.status = 'ready';
+        
+        // Auto-select first loaded item
+        if (this.activeIndex === -1) {
+            this.activeIndex = pendingIndex;
+        }
+        
+        this.onItemReady(item, pendingIndex);
+        this.isProcessing = false;
+        this.onQueueUpdate(this.queue);
+        this._processNext();
+    }
+
+    _handleError(item, err) {
+        item.status = 'error';
+        this.onItemError(item, err);
+        this.isProcessing = false;
+        this.onQueueUpdate(this.queue);
+        this._processNext();
     }
 
     _generateId() {
