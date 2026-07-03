@@ -1,0 +1,35 @@
+{
+  "name": "@craftthingy-digital-innovation/cty-client-side-ocr-queue-web",
+  "version": "1.0.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CraftThingy-Digital-Innovation/cty-client-side-ocr-queue-web.git"
+  },
+  "bugs": {
+    "url": "https://github.com/CraftThingy-Digital-Innovation/cty-client-side-ocr-queue-web/issues"
+  },
+  "homepage": "https://github.com/CraftThingy-Digital-Innovation/cty-client-side-ocr-queue-web#readme",
+  "main": "./dist/cty-client-side-ocr-queue.umd.js",
+  "module": "./dist/cty-client-side-ocr-queue.es.js",
+  "exports": {
+    ".": {
+      "import": "./dist/cty-client-side-ocr-queue.es.js",
+      "require": "./dist/cty-client-side-ocr-queue.umd.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "vite build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vite": "^5.2.0"
+  }
+}
